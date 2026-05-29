@@ -11,6 +11,8 @@ const Billing = () => {
 
   const [billData, setBillData] = useState({
     party_id: "",
+    customer_name: "",
+    customer_phone: "",
     transaction_number: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
@@ -18,7 +20,7 @@ const Billing = () => {
   });
 
   const [lines, setLines] = useState([
-    { id: Date.now(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }
+    { id: Date.now() + Math.random(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }
   ]);
 
   useEffect(() => {
@@ -34,12 +36,14 @@ const Billing = () => {
   }, []);
 
   const addLine = () => {
-    setLines([...lines, { id: Date.now(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }]);
+    setLines([...lines, { id: Date.now() + Math.random(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }]);
   };
 
   const removeLine = (id) => {
     if (lines.length > 1) {
       setLines(lines.filter(line => line.id !== id));
+    } else {
+      setLines([{ id: Date.now() + Math.random(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }]);
     }
   };
 
@@ -85,8 +89,8 @@ const Billing = () => {
   }, [lines]);
 
   const handleSave = async () => {
-    if (!billData.party_id) {
-      alert("Please select a customer.");
+    if (billData.party_id === "" && billData.customer_name.trim() === "") {
+      alert("Please enter a customer name for the regular customer.");
       return;
     }
     const validLines = lines.filter(l => l.item_name.trim() !== "");
@@ -107,7 +111,9 @@ const Billing = () => {
         .insert([{
           user_id: storedUser.id,
           type: 'Sale',
-          party_id: billData.party_id,
+          party_id: billData.party_id || null,
+          customer_name: billData.party_id === "" ? billData.customer_name : null,
+          customer_phone: billData.party_id === "" ? billData.customer_phone : null,
           transaction_number: billData.transaction_number,
           date: billData.date,
           due_date: billData.dueDate,
@@ -153,6 +159,8 @@ const Billing = () => {
         setSuccess(false);
         setBillData({
           party_id: "",
+          customer_name: "",
+          customer_phone: "",
           transaction_number: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
           date: new Date().toISOString().split('T')[0],
           dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
@@ -179,7 +187,9 @@ const Billing = () => {
           <p className="text-gray-500 text-xs mt-1">Generate a new bill for your customers.</p>
         </div>
       </div>
+          
 
+          {/* header selections */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1.5">
@@ -189,10 +199,35 @@ const Billing = () => {
               onChange={(e) => setBillData({...billData, party_id: e.target.value})}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-medium text-gray-700"
             >
-              <option value="">Select Customer...</option>
+              <option value="">Regular Customer</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+
+          {billData.party_id === "" && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Customer Name *</label>
+                <input 
+                  type="text" 
+                  placeholder="Walk-in Customer"
+                  value={billData.customer_name}
+                  onChange={(e) => setBillData({...billData, customer_name: e.target.value})}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-medium text-gray-700"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Phone Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 9876543210"
+                  value={billData.customer_phone}
+                  onChange={(e) => setBillData({...billData, customer_phone: e.target.value})}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-medium text-gray-700"
+                />
+              </div>
+            </>
+          )}
 
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold text-gray-500 uppercase">Invoice Number</label>
@@ -226,8 +261,8 @@ const Billing = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div className="w-full">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-100">
               <tr>
@@ -256,16 +291,20 @@ const Billing = () => {
                       />
                       {focusedLine === line.id && (
                         <div className="absolute z-50 left-4 right-4 top-full mt-1 bg-white border border-gray-200 shadow-xl rounded-xl max-h-48 overflow-y-auto">
-                          {products.filter(p => p.name.toLowerCase().includes(line.item_name.toLowerCase())).map(p => (
+                          {products.filter(p => p.name.toLowerCase().includes((line.item_name || "").toLowerCase())).map(p => (
                             <div 
                               key={p.id}
                               className="px-4 py-2 hover:bg-purple-50 cursor-pointer text-sm font-semibold text-gray-800 border-b border-gray-50 last:border-0"
-                              onClick={() => handleProductSelect(line.id, p.id)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleProductSelect(line.id, p.id);
+                                setFocusedLine(null);
+                              }}
                             >
                               {p.name} <span className="text-xs text-gray-400 font-normal ml-2">₹{p.sale_price}</span>
                             </div>
                           ))}
-                          {products.filter(p => p.name.toLowerCase().includes(line.item_name.toLowerCase())).length === 0 && (
+                          {products.filter(p => p.name.toLowerCase().includes((line.item_name || "").toLowerCase())).length === 0 && (
                             <div className="px-4 py-3 text-xs text-gray-500 italic">Press enter or tab to use as custom item</div>
                           )}
                         </div>

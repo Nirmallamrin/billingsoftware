@@ -147,3 +147,9 @@ CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = '
 CREATE POLICY "Authenticated users can upload images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'product_images' AND auth.role() = 'authenticated');
 CREATE POLICY "Users can update their own images" ON storage.objects FOR UPDATE USING (bucket_id = 'product_images' AND auth.uid() = owner);
 CREATE POLICY "Users can delete their own images" ON storage.objects FOR DELETE USING (bucket_id = 'product_images' AND auth.uid() = owner);
+
+-- ==========================================
+-- ADD ONE-OFF CUSTOMER FIELDS TO TRANSACTIONS
+-- ==========================================
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS customer_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS customer_phone TEXT;
