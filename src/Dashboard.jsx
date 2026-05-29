@@ -50,8 +50,20 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [activeItem, setActiveItem] = useState("Dashboard");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('invox_user');
@@ -102,10 +114,10 @@ const Dashboard = () => {
   if (activeItem === "Billing") {
     return (
       <div className="fixed inset-0 z-50 bg-[#F5F7FB] overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-10 relative mt-8">
+        <div className="max-w-[1600px] w-full mx-auto md:p-10 p-4 relative md:mt-8 mt-2">
           <button 
             onClick={() => setActiveItem("Dashboard")}
-            className="absolute -top-4 right-10 p-3 bg-white rounded-full shadow-lg text-gray-500 hover:text-red-500 hover:scale-110 transition-all z-50 cursor-pointer"
+            className="absolute md:-top-4 md:right-10 top-0 right-4 p-3 bg-white rounded-full shadow-lg text-gray-500 hover:text-red-500 hover:scale-110 transition-all z-50 cursor-pointer"
           >
             <FiX size={24} />
           </button>
@@ -117,14 +129,24 @@ const Dashboard = () => {
 
   return (
     <div className="flex h-screen bg-[#F5F7FB] font-sans overflow-hidden">
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-[60] md:hidden" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`bg-[#1c1c1c] border-r border-gray-100 flex flex-col shrink-0 transition-all duration-300 ease-in-out relative ${isSidebarOpen ? "w-46" : "w-20"}`}
+        className={`bg-[#1c1c1c] flex flex-col shrink-0 transition-all duration-300 ease-in-out absolute md:relative z-[70] h-full ${
+          isSidebarOpen ? "translate-x-0 w-64 md:w-46" : "-translate-x-full md:translate-x-0 md:w-20"
+        }`}
       >
-        {/* Toggle Button centered on border */}
+        {/* Toggle Button centered on border (Desktop Only) */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="absolute -right-2.5 top-10 w-6 h-6 bg-white rounded-full border border-gray-200 shadow-lg flex items-center justify-center z-[60] cursor-pointer hover:bg-gray-50 transition-all hover:scale-110 active:scale-95"
+          className="hidden md:flex absolute -right-2.5 top-10 w-6 h-6 bg-white rounded-full border border-gray-200 shadow-lg items-center justify-center z-[60] cursor-pointer hover:bg-gray-50 transition-all hover:scale-110 active:scale-95"
         >
           <FiChevronLeft 
             size={14} 
@@ -201,6 +223,12 @@ const Dashboard = () => {
         {/* Header */}
         <header className="h-12 bg-white border-b border-gray-50 flex items-center justify-between px-6 shrink-0 sticky top-0 z-50">
           <div className="flex items-center gap-4">
+            <button 
+              className="md:hidden p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <FiMenu size={20} />
+            </button>
             <h1 className="text-lg font-bold text-gray-800 tracking-tight">
               {activeItem}
             </h1>
@@ -210,8 +238,8 @@ const Dashboard = () => {
         </header>
 
         {/* Dynamic Page Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-[#F5F7FB]">
-          <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#F5F7FB]">
+          <div className="max-w-[1600px] w-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <PageComponent />
           </div>
         </div>

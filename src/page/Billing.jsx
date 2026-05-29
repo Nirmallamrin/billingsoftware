@@ -262,8 +262,8 @@ const Billing = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-        <div className="w-full">
-          <table className="w-full text-left border-collapse">
+        <div className="w-full overflow-x-auto md:overflow-visible pb-32 md:pb-0">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-100">
               <tr>
                 <th className="px-6 py-4">Item</th>
