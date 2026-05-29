@@ -12,7 +12,8 @@ import {
   FiMenu,
   FiChevronLeft,
   FiUser,
-  FiLogOut
+  FiLogOut,
+  FiX
 } from "react-icons/fi";
 
 import { LuLayoutDashboard } from "react-icons/lu";
@@ -98,11 +99,27 @@ const Dashboard = () => {
 
   if (!user) return null;
 
+  if (activeItem === "Billing") {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#F5F7FB] overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-10 relative mt-8">
+          <button 
+            onClick={() => setActiveItem("Dashboard")}
+            className="absolute -top-4 right-10 p-3 bg-white rounded-full shadow-lg text-gray-500 hover:text-red-500 hover:scale-110 transition-all z-50 cursor-pointer"
+          >
+            <FiX size={24} />
+          </button>
+          <Billing />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#F5F7FB] font-sans overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`bg-black border-r border-gray-100 flex flex-col shrink-0 transition-all duration-300 ease-in-out relative ${isSidebarOpen ? "w-46" : "w-20"}`}
+        className={`bg-[#1c1c1c] border-r border-gray-100 flex flex-col shrink-0 transition-all duration-300 ease-in-out relative ${isSidebarOpen ? "w-46" : "w-20"}`}
       >
         {/* Toggle Button centered on border */}
         <button
@@ -138,7 +155,7 @@ const Dashboard = () => {
               onClick={() => setActiveItem(item.label)}
               title={!isSidebarOpen ? item.label : ""}
               className={`w-full cursor-pointer flex items-center ${isSidebarOpen ? "px-4" : "justify-center"} py-2 rounded-2xl transition-all group relative ${activeItem === item.label
-                ? "bg-[#2ECC71] text-white shadow-lg shadow-[#2ECC71]/20"
+                ? "bg-[#5e5e5e] text-white shadow-lg "
                 : "text-gray-400 hover:text-gray-200 hover:bg-[#252525]"
                 }`}
             >
@@ -153,67 +170,47 @@ const Dashboard = () => {
             </button>
           ))}
         </nav>
+
+        {/* Profile Section at Bottom of Sidebar */}
+        <div className="mt-auto p-3 border-t border-[#2a2a2a]">
+          <div 
+            onClick={() => setActiveItem("My Profile")}
+            className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3' : 'justify-center'} py-2 rounded-xl hover:bg-green-500/20 transition-all cursor-pointer group`}
+            title="My Profile"
+          >
+            <div className="relative shrink-0">
+              <img
+                src={`https://ui-avatars.com/api/?name=${user.name}&background=2ECC71&color=fff`}
+                alt="User"
+                className="w-8 h-8 rounded-lg object-cover"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#1c1c1c]" />
+            </div>
+            {isSidebarOpen && (
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-xs font-bold text-gray-200 group-hover:text-green-500 transition-colors truncate">{user.name}</span>
+                <span className="text-[9px] text-gray-500 tracking-widest uppercase truncate">{user.role} Account</span>
+              </div>
+            )}
+          </div>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-13 bg-white border-b border-gray-50 flex items-center justify-between px-10 shrink-0 sticky top-0 z-50">
+        <header className="h-12 bg-white border-b border-gray-50 flex items-center justify-between px-6 shrink-0 sticky top-0 z-50">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+            <h1 className="text-lg font-bold text-gray-800 tracking-tight">
               {activeItem}
             </h1>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <div
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-4 p-1.5 pr-4 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer border border-transparent hover:border-gray-100"
-              >
-                <div className="relative">
-                  <img
-                    src={`https://ui-avatars.com/api/?name=${user.name}&background=2ECC71&color=fff`}
-                    alt="User"
-                    className="w-10 h-10 rounded-xl object-cover ring-2 ring-transparent shadow-sm"
-                  />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
-                </div>
-                <div className="hidden md:flex flex-col">
-                  <span className="text-sm font-bold text-gray-800">{user.name}</span>
-                  <span className="text-[10px] text-gray-400 tracking-widest uppercase">{user.role} Account</span>
-                </div>
-              </div>
-
-              {/* Profile Dropdown */}
-              {isProfileOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)}></div>
-                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-[2rem] shadow-2xl shadow-black/10 border border-gray-100 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <button
-                      onClick={() => { setActiveItem("My Profile"); setIsProfileOpen(false); }}
-                      className="w-full flex items-center gap-3 p-4 rounded-2xl text-gray-600 hover:bg-[#2ECC71]/10 hover:text-[#2ECC71] transition-all font-semibold"
-                    >
-                      <FiUser size={18} />
-                      <span>My Profile</span>
-                    </button>
-                    <hr className="my-2 border-gray-50" />
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 p-4 rounded-2xl text-red-500 hover:bg-red-50 transition-all font-semibold"
-                    >
-                      <FiLogOut size={18} />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+          <div></div>
         </header>
 
         {/* Dynamic Page Content */}
-        <div className="flex-1 overflow-y-auto p-10 bg-[#F5F7FB]">
+        <div className="flex-1 overflow-y-auto p-6 bg-[#F5F7FB]">
           <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <PageComponent />
           </div>

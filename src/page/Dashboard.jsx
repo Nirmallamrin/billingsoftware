@@ -1,43 +1,107 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   FiPackage,
   FiFileText,
   FiPieChart,
   FiSettings,
 } from "react-icons/fi";
-
-const stats = [
-  {
-    label: "ORDERS",
-    value: "1,685",
-    subtext: "Since last month",
-    gradient: "from-[#F87171] to-[#EF4444]",
-    icon: <FiPackage className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
-  },
-  {
-    label: "REVENUE",
-    value: "$ 52,368.00",
-    subtext: "Since last month",
-    gradient: "from-[#2DD4BF] to-[#0D9488]",
-    icon: <FiFileText className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
-  },
-  {
-    label: "AVERAGE PRICE",
-    value: "15.8",
-    subtext: "Since last month",
-    gradient: "from-[#60A5FA] to-[#3B82F6]",
-    icon: <FiPieChart className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
-  },
-  {
-    label: "PRODUCT SOLD",
-    value: "1547",
-    subtext: "Since last month",
-    gradient: "from-[#A855F7] to-[#8B5CF6]",
-    icon: <FiPackage className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
-  },
-];
+import { supabase } from "../SupabaseClient";
 
 const DashboardPage = () => {
+  const [loading, setLoading] = useState(true);
+  const [dataStats, setDataStats] = useState({
+    orders: 0,
+    revenue: 0,
+    avgPrice: 0,
+    productsSold: 0
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData?.user) {
+          setLoading(false);
+          return;
+        }
+
+        const { data: invoices, error } = await supabase
+          .from('invoices')
+          .select('id, total')
+          .eq('user_id', userData.user.id);
+        
+        if (error) throw error;
+
+        let totalRevenue = 0;
+        let totalOrders = invoices?.length || 0;
+        
+        invoices?.forEach(inv => {
+          totalRevenue += parseFloat(inv.total) || 0;
+        });
+
+        // Let's get total products sold from invoice lines if possible
+        // To keep it simple, we'll just query invoice lines for this user
+        // But since invoice_lines doesn't have user_id, we just get it via invoice IDs.
+        let productsSold = 0;
+        if (invoices && invoices.length > 0) {
+           const invoiceIds = invoices.map(i => i.id);
+           const { data: lines } = await supabase
+             .from('invoice_lines')
+             .select('qty')
+             .in('invoice_id', invoiceIds);
+             
+           lines?.forEach(line => {
+             productsSold += parseFloat(line.qty) || 0;
+           });
+        }
+
+        setDataStats({
+          orders: totalOrders,
+          revenue: totalRevenue,
+          avgPrice: totalOrders > 0 ? (totalRevenue / totalOrders) : 0,
+          productsSold: productsSold
+        });
+      } catch (err) {
+        console.error("Error fetching stats", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchStats();
+  }, []);
+
+  const stats = [
+    {
+      label: "INVOICES",
+      value: dataStats.orders.toString(),
+      subtext: "Total created",
+      gradient: "from-[#F87171] to-[#EF4444]",
+      icon: <FiPackage className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
+    },
+    {
+      label: "REVENUE",
+      value: `$ ${dataStats.revenue.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+      subtext: "Total sum",
+      gradient: "from-[#2DD4BF] to-[#0D9488]",
+      icon: <FiFileText className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
+    },
+    {
+      label: "AVERAGE INVOICE",
+      value: `$ ${dataStats.avgPrice.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+      subtext: "Per invoice",
+      gradient: "from-[#60A5FA] to-[#3B82F6]",
+      icon: <FiPieChart className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
+    },
+    {
+      label: "ITEMS SOLD",
+      value: dataStats.productsSold.toString(),
+      subtext: "Total quantity",
+      gradient: "from-[#A855F7] to-[#8B5CF6]",
+      icon: <FiPackage className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
+    },
+  ];
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Welcome Section */}
