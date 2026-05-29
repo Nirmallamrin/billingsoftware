@@ -16,42 +16,71 @@ const DashboardPage = () => {
     productsSold: 0
   });
 
+  const [chartData, setChartData] = useState([]);
+  const [moneyStats, setMoneyStats] = useState({
+    totalBilled: 0,
+    totalReceived: 0,
+    totalPending: 0,
+    receivedPercentage: 0
+  });
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData?.user) {
+        const storedUser = JSON.parse(localStorage.getItem('invox_user'));
+        if (!storedUser) {
           setLoading(false);
           return;
         }
 
-        const { data: invoices, error } = await supabase
-          .from('invoices')
-          .select('id, total')
-          .eq('user_id', userData.user.id);
+        const { data: transactions, error } = await supabase
+          .from('transactions')
+          .select('id, total_amount, amount_paid, date, type')
+          .eq('user_id', storedUser.id)
+          .eq('type', 'Sale');
         
         if (error) throw error;
 
         let totalRevenue = 0;
-        let totalOrders = invoices?.length || 0;
+        let totalReceived = 0;
+        let totalOrders = transactions?.length || 0;
         
-        invoices?.forEach(inv => {
-          totalRevenue += parseFloat(inv.total) || 0;
+        // Group by Month for Chart
+        const monthlyData = {};
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        
+        // Initialize last 6 months to 0
+        const d = new Date();
+        for (let i = 5; i >= 0; i--) {
+          let pastD = new Date(d.getFullYear(), d.getMonth() - i, 1);
+          let mName = monthNames[pastD.getMonth()];
+          monthlyData[mName] = 0;
+        }
+
+        transactions?.forEach(inv => {
+          const invTotal = parseFloat(inv.total_amount) || 0;
+          const invPaid = parseFloat(inv.amount_paid) || 0;
+          totalRevenue += invTotal;
+          totalReceived += invPaid;
+
+          const invDate = new Date(inv.date);
+          const monthStr = monthNames[invDate.getMonth()];
+          if (monthlyData[monthStr] !== undefined) {
+             monthlyData[monthStr] += invTotal;
+          }
         });
 
-        // Let's get total products sold from invoice lines if possible
-        // To keep it simple, we'll just query invoice lines for this user
-        // But since invoice_lines doesn't have user_id, we just get it via invoice IDs.
+        // Compute items sold
         let productsSold = 0;
-        if (invoices && invoices.length > 0) {
-           const invoiceIds = invoices.map(i => i.id);
+        if (transactions && transactions.length > 0) {
+           const txIds = transactions.map(i => i.id);
            const { data: lines } = await supabase
-             .from('invoice_lines')
-             .select('qty')
-             .in('invoice_id', invoiceIds);
+             .from('transaction_items')
+             .select('quantity')
+             .in('transaction_id', txIds);
              
            lines?.forEach(line => {
-             productsSold += parseFloat(line.qty) || 0;
+             productsSold += parseFloat(line.quantity) || 0;
            });
         }
 
@@ -61,6 +90,31 @@ const DashboardPage = () => {
           avgPrice: totalOrders > 0 ? (totalRevenue / totalOrders) : 0,
           productsSold: productsSold
         });
+
+        const totalPending = totalRevenue - totalReceived;
+        const receivedPercentage = totalRevenue > 0 ? (totalReceived / totalRevenue) * 100 : 0;
+        
+        setMoneyStats({
+          totalBilled: totalRevenue,
+          totalReceived,
+          totalPending: totalPending > 0 ? totalPending : 0,
+          receivedPercentage: Math.round(receivedPercentage)
+        });
+
+        // Format chart data
+        let maxVal = 0;
+        Object.values(monthlyData).forEach(v => { if (v > maxVal) maxVal = v; });
+        
+        const formattedChart = Object.keys(monthlyData).map(m => {
+           let val = monthlyData[m];
+           let pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+           // Minimum height so it's visible if it has value
+           if (val > 0 && pct < 10) pct = 10;
+           return { h: `${pct}%`, l: m, v: val };
+        });
+        
+        setChartData(formattedChart);
+
       } catch (err) {
         console.error("Error fetching stats", err);
       } finally {
@@ -81,14 +135,14 @@ const DashboardPage = () => {
     },
     {
       label: "REVENUE",
-      value: `$ ${dataStats.revenue.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+      value: `₹ ${dataStats.revenue.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
       subtext: "Total sum",
       gradient: "from-[#2DD4BF] to-[#0D9488]",
       icon: <FiFileText className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
     },
     {
       label: "AVERAGE INVOICE",
-      value: `$ ${dataStats.avgPrice.toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+      value: `₹ ${dataStats.avgPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
       subtext: "Per invoice",
       gradient: "from-[#60A5FA] to-[#3B82F6]",
       icon: <FiPieChart className="text-white/20 w-16 h-16 absolute -right-2 -bottom-2" />,
@@ -108,7 +162,7 @@ const DashboardPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Dashboard</h2>
-          <p className="text-sm text-gray-400 mt-1">Welcome to Invoyse System</p>
+          <p className="text-sm text-gray-400 mt-1">Welcome to Invox System</p>
         </div>
         <button className="flex items-center gap-2 px-6 py-2.5 bg-[#6366F1] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#6366F1]/20 hover:scale-105 active:scale-95 transition-all">
           <FiSettings /> Settings
@@ -140,52 +194,49 @@ const DashboardPage = () => {
         <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 flex flex-col h-[450px]">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-lg font-bold text-gray-800">Net Income</h3>
-              <p className="text-xs text-indigo-500 font-bold mt-1">Avg. $5,309</p>
+              <h3 className="text-lg font-bold text-gray-800">Sales Trend (6 Months)</h3>
+              <p className="text-xs text-indigo-500 font-bold mt-1">Total ₹{dataStats.revenue.toLocaleString('en-IN')}</p>
             </div>
             <div className="flex gap-2">
               <select className="bg-gray-50 border-none rounded-lg text-xs font-bold text-gray-500 px-4 py-2 focus:ring-0">
                 <option>Monthly</option>
               </select>
-              <select className="bg-gray-50 border-none rounded-lg text-xs font-bold text-gray-500 px-4 py-2 focus:ring-0">
-                <option>Last Year</option>
-              </select>
             </div>
           </div>
 
-          {/* Bar Chart Mockup */}
+          {/* Bar Chart Dynamic */}
           <div className="flex-1 flex items-end justify-between gap-4 px-4 pb-2">
-            {[
-              { h: "60%", l: "Jan" },
-              { h: "45%", l: "Feb" },
-              { h: "30%", l: "Mar" },
-              { h: "35%", l: "Apr" },
-              { h: "55%", l: "May" },
-              { h: "40%", l: "Jun" },
-              { h: "50%", l: "Jul" },
-            ].map((item, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center group relative cursor-pointer">
-                <div className="w-full flex justify-center gap-1">
+            {chartData.map((item, idx) => (
+              <div key={idx} className="flex-1 flex flex-col items-center group relative cursor-pointer h-full justify-end">
+                <div className="w-full flex justify-center gap-1 h-full items-end relative">
+                   {/* Tooltip */}
+                   <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs font-bold py-1 px-2 rounded-lg pointer-events-none z-10 whitespace-nowrap">
+                     ₹{item.v.toLocaleString('en-IN')}
+                   </div>
+                   
                   <div
-                    className="w-10 bg-gradient-to-t from-indigo-500 to-indigo-300 rounded-t-lg transition-all group-hover:from-indigo-600 duration-300 relative"
-                    style={{ height: item.h }}
+                    className="w-10 bg-gradient-to-t from-indigo-500 to-indigo-300 rounded-t-lg transition-all group-hover:from-indigo-600 duration-300 relative min-h-[5px]"
+                    style={{ height: item.h === '0%' ? '5px' : item.h }}
                   >
                     <div className="absolute inset-x-0 -bottom-12 h-12 bg-indigo-50 rounded-b-lg opacity-40 group-hover:opacity-60 transition-opacity" />
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-gray-400 mt-16 uppercase tracking-wider">{item.l}</span>
+                <span className="text-[10px] font-bold text-gray-400 mt-6 uppercase tracking-wider">{item.l}</span>
               </div>
             ))}
+            {chartData.length === 0 && !loading && (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 font-medium">No sales data found.</div>
+            )}
           </div>
         </div>
 
-        {/* Money/Budget Section */}
+        {/* Money/Collection Section */}
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
           <div>
-            <h3 className="text-lg font-bold text-gray-800">Money</h3>
+            <h3 className="text-lg font-bold text-gray-800">Payment Collection</h3>
             <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-gray-400">Total Budget</p>
-              <p className="text-lg font-black text-green-500">$50,000</p>
+              <p className="text-sm text-gray-400">Total Billed</p>
+              <p className="text-lg font-black text-green-500">₹{moneyStats.totalBilled.toLocaleString('en-IN')}</p>
             </div>
           </div>
 
@@ -209,14 +260,14 @@ const DashboardPage = () => {
                   strokeWidth="10"
                   fill="transparent"
                   strokeDasharray={440}
-                  strokeDashoffset={440 * (1 - 0.48)}
+                  strokeDashoffset={440 * (1 - (moneyStats.receivedPercentage / 100))}
                   strokeLinecap="round"
-                  className="text-indigo-500"
+                  className="text-indigo-500 transition-all duration-1000"
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-black text-gray-800 leading-none">48%</span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Saved</span>
+                <span className="text-3xl font-black text-gray-800 leading-none">{moneyStats.receivedPercentage}%</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Collected</span>
               </div>
             </div>
           </div>
@@ -226,20 +277,20 @@ const DashboardPage = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-red-400 rounded-full" />
-                  <span className="text-xs font-bold text-gray-800">Total Spent</span>
+                  <span className="text-xs font-bold text-gray-800">Pending</span>
                 </div>
-                <p className="text-sm font-black text-gray-400 mt-1">$18,570</p>
+                <p className="text-sm font-black text-gray-400 mt-1">₹{moneyStats.totalPending.toLocaleString('en-IN')}</p>
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-2 justify-end">
                   <div className="w-2 h-2 bg-indigo-500 rounded-full" />
-                  <span className="text-xs font-bold text-gray-800">Money Saved</span>
+                  <span className="text-xs font-bold text-gray-800">Received</span>
                 </div>
-                <p className="text-sm font-black text-gray-400 mt-1">$31,430</p>
+                <p className="text-sm font-black text-gray-400 mt-1">₹{moneyStats.totalReceived.toLocaleString('en-IN')}</p>
               </div>
             </div>
             <button className="w-full text-center text-xs font-black text-[#6366F1] uppercase tracking-widest pt-4 border-t border-gray-100 hover:text-indigo-700 transition-colors">
-              View Full Report
+              View Detailed Report
             </button>
           </div>
         </div>
