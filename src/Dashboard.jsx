@@ -35,7 +35,7 @@ import HelpCenter from "./page/HelpCenter";
 import Settings from "./page/Settings";
 import ToDo from "./page/ToDo";
 
-import logo1 from "./assets/logo/logo.png";
+import logo1 from "./assets/logo/logo.PNG";
 import logo2 from "./assets/logo/logo2.jpeg";
 
 
