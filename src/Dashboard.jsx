@@ -249,8 +249,8 @@ const Dashboard = () => {
             </div>
             {isSidebarOpen && (
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-bold text-gray-200 group-hover:text-green-500 transition-colors truncate">{user.name}</span>
-                <span className="text-[9px] text-gray-500 tracking-widest uppercase truncate">{user.role} Account</span>
+                <span className="text-xs font-bold text-gray-500 group-hover:text-green-500 transition-colors truncate">{user.name}</span>
+                
               </div>
             )}
           </div>
