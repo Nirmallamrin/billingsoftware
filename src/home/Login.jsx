@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FiSmartphone, FiLock, FiArrowRight, FiMail } from "react-icons/fi";
 import homeBg from '../assets/HomeBg/img2.png';
 import logo from '../assets/logo.png';
-import Navbar from './Navbar';
 import { supabase } from '../SupabaseClient';
 
 const Login = () => {
@@ -54,7 +53,6 @@ const Login = () => {
 
     return (
         <div>
-            <Navbar />
             <div className='mt-10'>
                 <div className="relative min-h-screen flex items-center justify-center p-6 font-sans overflow-hidden">
                     {/* Background identical to Home Page */}

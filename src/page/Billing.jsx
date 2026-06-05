@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { FiPlus, FiTrash2, FiFileText, FiLoader, FiCheck, FiSearch } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiFileText, FiLoader, FiCheck, FiSearch, FiRefreshCw } from "react-icons/fi";
 import { supabase } from "../SupabaseClient";
 
-const Billing = () => {
+const Billing = ({ setActiveItem }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [customers, setCustomers] = useState([]);
@@ -16,7 +16,8 @@ const Billing = () => {
     transaction_number: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
-    notes: ""
+    notes: "",
+    payment_mode: "Unpaid"
   });
 
   const [lines, setLines] = useState([
@@ -88,6 +89,20 @@ const Billing = () => {
     return { subtotal, tax_amount, total: subtotal + tax_amount };
   }, [lines]);
 
+  const handleClear = () => {
+    setBillData({
+      party_id: "",
+      customer_name: "",
+      customer_phone: "",
+      transaction_number: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
+      date: new Date().toISOString().split('T')[0],
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
+      notes: "",
+      payment_mode: "Unpaid"
+    });
+    setLines([{ id: Date.now(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }]);
+  };
+
   const handleSave = async () => {
     if (billData.party_id === "" && billData.customer_name.trim() === "") {
       alert("Please enter a customer name for the regular customer.");
@@ -106,6 +121,10 @@ const Billing = () => {
       if (!storedUser) throw new Error("Not logged in");
 
       // Insert Transaction
+      const finalNotes = billData.payment_mode !== "Unpaid" 
+        ? (billData.notes ? `Payment Mode: ${billData.payment_mode}\n${billData.notes}` : `Payment Mode: ${billData.payment_mode}`)
+        : billData.notes;
+
       const { data: txData, error: txError } = await supabase
         .from('transactions')
         .insert([{
@@ -114,14 +133,14 @@ const Billing = () => {
           party_id: billData.party_id || null,
           customer_name: billData.party_id === "" ? billData.customer_name : null,
           customer_phone: billData.party_id === "" ? billData.customer_phone : null,
-          transaction_number: billData.transaction_number,
-          date: billData.date,
-          due_date: billData.dueDate,
+          transaction_number: billData.transaction_number || `INV-${Date.now()}`,
+          date: billData.date || new Date().toISOString().split('T')[0],
+          due_date: billData.dueDate || new Date().toISOString().split('T')[0],
           subtotal: calculations.subtotal,
           tax_amount: calculations.tax_amount,
           total_amount: calculations.total,
-          notes: billData.notes,
-          status: 'Unpaid'
+          notes: finalNotes,
+          status: billData.payment_mode === "Unpaid" ? 'Unpaid' : 'Paid'
         }])
         .select()
         .single();
@@ -155,23 +174,11 @@ const Billing = () => {
       }
       
       setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        setBillData({
-          party_id: "",
-          customer_name: "",
-          customer_phone: "",
-          transaction_number: `INV-${Math.floor(100000 + Math.random() * 900000)}`,
-          date: new Date().toISOString().split('T')[0],
-          dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
-          notes: ""
-        });
-        setLines([{ id: Date.now(), item_id: "", item_name: "", qty: 1, unit_price: 0, tax_rate: 0 }]);
-      }, 2000);
+      // We will show a modal instead of auto-clearing
 
     } catch (err) {
       console.error(err);
-      alert("Error saving invoice: " + err.message);
+      alert("Error saving invoice: " + (err.message || JSON.stringify(err)));
     } finally {
       setIsSaving(false);
     }
@@ -257,6 +264,22 @@ const Billing = () => {
               onChange={(e) => setBillData({...billData, dueDate: e.target.value})}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-medium text-gray-700"
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-gray-500 uppercase">Payment Mode</label>
+            <select 
+              value={billData.payment_mode}
+              onChange={(e) => setBillData({...billData, payment_mode: e.target.value})}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-medium text-gray-700"
+            >
+              <option value="Unpaid">Unpaid</option>
+              <option value="Cash">Cash</option>
+              <option value="Gpay">Gpay</option>
+              <option value="PhonePe">PhonePe</option>
+              <option value="Paytm">Paytm</option>
+              <option value="Card">Card</option>
+            </select>
           </div>
         </div>
       </div>
@@ -389,15 +412,56 @@ const Billing = () => {
         </div>
       </div>
 
-      <div className="flex justify-end mt-2">
+      <div className="flex justify-end mt-4 gap-4">
+        <button 
+          onClick={handleClear}
+          disabled={isSaving}
+          className="text-gray-500 hover:text-gray-700 px-6 py-3 rounded-xl font-bold text-lg transition-all hover:bg-gray-100 disabled:opacity-50 flex items-center gap-2"
+        >
+          <FiRefreshCw /> Clear Form
+        </button>
         <button 
           onClick={handleSave}
           disabled={isSaving}
-          className={`${success ? 'bg-green-500' : 'bg-purple-600 hover:bg-purple-700'} text-white px-10 py-3 rounded-xl font-bold text-lg shadow-xl shadow-purple-600/20 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed`}
+          className={`bg-purple-600 hover:bg-purple-700 text-white px-10 py-3 rounded-xl font-bold text-lg shadow-xl shadow-purple-600/20 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed`}
         >
-          {isSaving ? <FiLoader className="animate-spin" /> : success ? <FiCheck /> : 'Save Invoice'}
+          {isSaving ? <FiLoader className="animate-spin" /> : 'Save Invoice'}
         </button>
       </div>
+
+      {/* Success Modal */}
+      {success && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center animate-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-6 shadow-inner">
+              <FiCheck size={40} strokeWidth={3} />
+            </div>
+            <h3 className="text-2xl font-black text-gray-800 mb-2">Invoice Saved!</h3>
+            <p className="text-gray-500 font-medium mb-8">Your invoice has been successfully saved to the system.</p>
+            <div className="flex flex-col w-full gap-3">
+              <button 
+                onClick={() => {
+                  setSuccess(false);
+                  handleClear();
+                }} 
+                className="w-full bg-purple-600 text-white font-bold py-3.5 rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-600/20"
+              >
+                Start New Bill
+              </button>
+              <button 
+                onClick={() => {
+                  setSuccess(false);
+                  handleClear();
+                  if (setActiveItem) setActiveItem("Invoices");
+                }} 
+                className="w-full bg-gray-50 text-gray-700 font-bold py-3.5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
+              >
+                View Invoices
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
